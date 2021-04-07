@@ -1,6 +1,8 @@
 # Pre-installation
 
-**On a fresh Ubuntu Server 20.04 installatin, with a static IP and Domain Name *ubuntu.example*.**
+> Our group installed Nextcloud on both ubuntu1-group3 and ubuntu3-group3. This document uses `ubuntuN` as a stand-in for whichever one of the two is being worked on.
+
+**On a fresh Ubuntu Server 20.04 installatin, with a static IP and Fully-Qualified Domain Name *ubuntuN-group3.group3.local*.**
 
 0. Update to latest software: `sudo apt upgdate && sudo apt upgrade`
 
@@ -23,7 +25,7 @@ FLUSH PRIVILEGES;
 ```
 *exit MariaDB with **Ctrl+d**.*
 
-3. Add a CNAME DNS record for ***cloud.ubuntu.example*** pointing to ***ubuntu.example***
+3. Add a CNAME DNS record for ***cloud.ubuntuN-group3.group3.local*** pointing to ***ubuntu.ubuntuN-group3.group3.local***
 
 4. Download Nextcloud
 
@@ -43,7 +45,7 @@ Create a configuration file at ***/etc/apache2/sites-available/nextcloud.conf***
 
 ```apacheconf
 <VirtualHost *:80>
-    ServerName cloud.ubuntu.example
+    ServerName cloud.ubuntuN-group3.group3.local
     DocumentRoot /var/www/nextcloud
 
     <Directory /var/www/nextcloud/>
@@ -67,18 +69,88 @@ Enable the site with the command `a2ensite nextcloud.conf`, and restart the serv
 
 1. Switch to the Nextcloud web root: `cd /var/www/nextcloud`
 
-2. Install with the following behemoth of a multi-line command:
+2. Install Nextcloud with either the command-line or the in-browser wizard
+
+## Command-line installation (done on `ubuntu1-group3`):
+
+run the following behemoth of a multi-line command:
 
 ```bash
 sudo -u www-data php occ maintenance:install \
 database "mysql" --database-name "nextcloud" \
 --database-user "nextcloud" --database-pass "somepassword" \
---admin-user "admin" --admin-pass "anotherpassword"
+--admin-user "group3" --admin-pass "anotherpassword"
+```
+## In-browser wizard installation (done on `ubuntu3-group3`)
+
+0. Install Firefox on mgmt01-group3 (Nextcloud does not work on Internet Explorer)
+
+1. In Firefox, open *http<nolink>://cloud.ubuntu3-group3.group3.local*
+
+2. Fill out the various forms with the requried information (Database is `mysql/mariadb`)
+
+Note: on our `ubuntu3` installation, the data directory was */var/www/nextcloud-data*, rather than the default */var/www/nextcloud/data*
+
+# Post-installation
+
+## Add Trusted Domain
+
+Edit the file **/var/www/nextcloud/config/config.php**, adding `1 => 'cloud.ubuntuN-group3.group3.local',` as an entry within the `trusted_domains` array.
+
+## Set up backups
+
+### On cent7a-group3
+
+Install required software with `sudo yum -y install nfs-utils`
+
+Run the following:
+
+```bash
+sudo firewall-cmd --permanent --add-service=nfs
+sudo firewall-cmd --reload
+sudo mkdir -p /nfsshare/ubuntu{1,3}
+echo '/nfsshare *(rw,sync,no_subtree_check)' | sudo tee -a /etc/exports
+sudo systemctl enable --now nfs
+exportfs -a
 ```
 
-# Post-Install configuration
+### On ubuntu1-group3 and ubuntu3-group3
 
-Edit the file **/var/www/nextcloud/config/config.php**, adding `1 => 'cloud.ubuntu.example',` as an entry within the `trusted_domains` array.
+Install required software with `sudo apt install lsyncd nfs-common -y`
 
+Mount the NFS directory: `sudo mkdir /nfsshare && sudo mount.nfs cent7a-group3:/nfsshare /nfsshare`
 
+Start **lsyncd**: `sudo lsyncd -rsync /var/www/nextcloud/data /nfsshare/ubuntuN-group3`
+
+Automatically do the above at boot using **cron**: run `sudo crontab -e` to edit the default crontab, and add the following line:
+
+```cron
+@reboot mount.ntfs cent7a-group3:/nfsshare /nfsshare && lsyncd -rsync /var/www/nextcloud/data /nfsshare/ubuntu1 # on ubuntu1-group3
+@reboot mount.ntfs cent7a-group3:/nfsshare /nfsshare && lsyncd -rsync /var/www/nextcloud-data /nfsshare/ubuntu3 # on ubuntu3-group3
+```
+
+<details>
+    <summary> About lsyncd </summary>
+    <a href="https://github.com/axkibe/lsyncd"><code>lsyncd</code></a> uses <code>rsync</code>, a tool for efficient file transferring and syncing, and uses <code>inotify</code>, a Linux kernel subsystem, to monitor for file changes, and instantly back them up.
+</details>
+
+**Relevant documentation**
+
+The following documentation and tutorials were immensly helpful in this project:
+
+Nextcloud Administrator Documentation Pages:
+
+* [Example installation on Ubuntu 20.04 LTS](https://docs.nextcloud.com/server/21/admin_manual/installation/example_ubuntu.html)
+* [Installation wizard](https://docs.nextcloud.com/server/21/admin_manual/installation/installation_wizard.html)
+* [Installation on Linux](https://docs.nextcloud.com/server/21/admin_manual/installation/source_installation.html)
+* [Installing from command line](https://docs.nextcloud.com/server/21/admin_manual/installation/command_line_installation.html)
+
+Online Tutorials:
+
+* [Setting Up an NFS Server and Client on CentOS 7.2 | HowToForge](https://www.howtoforge.com/tutorial/setting-up-an-nfs-server-and-client-on-centos-7/)
+* [Install NextCloud on Ubuntu 20.04 with Apache (LAMP Stack) | LinuxBabe](https://www.linuxbabe.com/ubuntu/install-nextcloud-ubuntu-20-04-apache-lamp-stack)
+
+`man` pages:
+
+* [lsyncd](http://manpages.ubuntu.com/manpages/focal/man1/lsyncd.1.html)
 
