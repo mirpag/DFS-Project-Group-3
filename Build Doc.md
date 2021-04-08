@@ -2,7 +2,7 @@
 
 > Our group installed Nextcloud on both ubuntu1-group3 and ubuntu3-group3. This document uses `ubuntuN` as a stand-in for whichever one of the two is being worked on.
 
-**On a fresh Ubuntu Server 20.04 installatin, with a static IP and Fully-Qualified Domain Name *ubuntuN-group3.group3.local*.**
+**On a fresh Ubuntu Server 20.04 installation, with a static IP and Fully-Qualified Domain Name *ubuntuN-group3.group3.local*.**
 
 0. Update to latest software: `sudo apt upgdate && sudo apt upgrade`
 
